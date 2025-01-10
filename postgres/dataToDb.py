@@ -1,6 +1,7 @@
 import pandas as pd
 from sqlalchemy import create_engine
 import os
+from arxiv.fetchpapers2 import get_recent_arxiv_papers
 
 db_params = {
     'host': os.getenv('DB_HOST'),
@@ -14,5 +15,5 @@ connection_string = f"postgresql://{db_params['user']}:{db_params['password']}@{
 
 engine = create_engine(connection_string)
 
-df = pd.read_csv('pubmed_data.csv')
-df.to_sql('pubmed_data', engine, if_exists='replace', index=False)
+df = get_recent_arxiv_papers()
+df.to_sql('arxiv_data', engine, if_exists='replace', index=False)
