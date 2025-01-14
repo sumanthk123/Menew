@@ -1,3 +1,0 @@
-User: Hello
-Assistant: Hello! How can I assist you today? Are you looking for information on a specific topic or need help with an academic paper?
-
