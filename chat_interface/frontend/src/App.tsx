@@ -1,104 +1,55 @@
-import React, { useState } from 'react';
-import { Brain, Search, Zap, Users, BookOpen, Globe, Award, ArrowDown, Sparkles, MessageSquare } from 'lucide-react';
-import Sidebar from './components/Sidebar';
-import ChatInput from './components/ChatInput';
-import Suggestions from './components/Suggestions';
-import ChatResponse from './components/ChatResponse';
-import LoadingResponse from './components/LoadingResponse';
+import React, { useState } from "react";
+import {
+  Brain,
+  Search,
+  Zap,
+  Users,
+  BookOpen,
+  Globe,
+  Award,
+  ArrowDown,
+} from "lucide-react";
+
+import Sidebar from "./components/Sidebar";
+import ChatInput from "./components/ChatInput";
+import Suggestions from "./components/Suggestions";
+import ChatResponse from "./components/ChatResponse";
+import LoadingResponse from "./components/LoadingResponse";
+
+// 1) Import your new sendChatMessage function:
+import { sendChatMessage } from "./components/chatService";
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [chatHistory, setChatHistory] = useState<Array<{ query: string; response: string }>>([]);
+  // 2) Keep an array of chat items
+  const [chatHistory, setChatHistory] = useState<
+    Array<{ query: string; response: string }>
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const responses = {
-    "How can I get started?": `Getting started with ScholarSync is easy! Here's your quick guide:
-
-1. Create Your Account
-   - Sign up with your email
-   - Set your research interests
-   - Complete your profile
-
-2. Explore Features
-   - Try the AI-powered search
-   - Save relevant papers
-   - Set up research alerts
-
-3. Connect & Collaborate
-   - Join research communities
-   - Follow leading researchers
-   - Share your insights
-
-Would you like to know more about any specific feature?`,
-
-    "What features are available?": `ScholarSync offers a comprehensive suite of research tools:
-
-1. Smart Search & Discovery
-   - AI-powered semantic search
-   - Real-time paper recommendations
-   - Citation network analysis
-
-2. Collaboration Tools
-   - Team workspaces
-   - Paper annotations
-   - Discussion threads
-
-3. Research Management
-   - Reference organization
-   - Citation formatting
-   - PDF library management
-
-4. Analytics & Insights
-   - Research impact metrics
-   - Trend analysis
-   - Collaboration networks
-
-Which feature would you like to explore further?`,
-
-    "Tell me about pricing": `ScholarSync offers flexible pricing plans to suit your needs:
-
-1. Free Plan
-   - Basic search features
-   - Limited paper access
-   - Community participation
-
-2. Professional ($15/month)
-   - Unlimited searches
-   - Full paper access
-   - Advanced analytics
-   - Priority support
-
-3. Team Plan ($49/month)
-   - Everything in Professional
-   - Team collaboration
-   - Admin controls
-   - API access
-
-4. Enterprise (Custom pricing)
-   - Custom solutions
-   - Dedicated support
-   - Integration services
-
-Would you like more details about a specific plan?`
-  };
-
-  const simulateResponse = async (query: string) => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsLoading(false);
-    return responses[query as keyof typeof responses] || `I understand you're asking about "${query}". Let me help you with that...`;
-  };
-
+  // 3) Remove simulateResponse, and call the real LLM:
   const handleSubmitQuery = async (query: string) => {
-    const response = await simulateResponse(query);
-    setChatHistory([{ query, response }]);
+    setIsLoading(true);
+    try {
+      // Call your Flask endpoint
+      const response = await sendChatMessage(query);
+
+      // Append new message to chat history
+      setChatHistory((prevHistory) => [...prevHistory, { query, response }]);
+    } catch (error) {
+      console.error("Error requesting LLM:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  // "Back" button in ChatResponse to clear the conversation
   const handleBack = () => {
     setChatHistory([]);
   };
 
   const renderContent = () => {
+    // If we have at least one conversation item, show ChatResponse
     if (chatHistory.length > 0) {
       return (
         <ChatResponse
@@ -106,10 +57,14 @@ Would you like more details about a specific plan?`
           onSubmit={handleSubmitQuery}
           onBack={handleBack}
           isLoading={isLoading}
+          // Don’t forget to pass setChatHistory if ChatResponse also needs it
+          setChatHistory={setChatHistory}
+          setIsLoading={setIsLoading}
         />
       );
     }
 
+    // Otherwise, show your landing/hero page
     return (
       <main className="flex flex-col items-center">
         {/* Hero Section */}
@@ -127,17 +82,26 @@ Would you like more details about a specific plan?`
           </div>
 
           {/* Chat Input */}
-          <div className="w-full max-w-2xl mb-12 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <div
+            className="w-full max-w-2xl mb-12 animate-fade-in"
+            style={{ animationDelay: "0.2s" }}
+          >
             <ChatInput onSubmit={handleSubmitQuery} />
             {isLoading && <LoadingResponse />}
           </div>
 
           {/* Suggestions */}
-          <div className="w-full max-w-4xl px-4 mb-16 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+          <div
+            className="w-full max-w-4xl px-4 mb-16 animate-fade-in"
+            style={{ animationDelay: "0.3s" }}
+          >
             <Suggestions onSubmit={handleSubmitQuery} />
           </div>
 
-          <ArrowDown size={24} className="text-violet-600 animate-bounce absolute bottom-8" />
+          <ArrowDown
+            size={24}
+            className="text-violet-600 animate-bounce absolute bottom-8"
+          />
         </div>
 
         {/* Features Section */}
@@ -150,17 +114,28 @@ Would you like more details about a specific plan?`
               <div className="p-6 bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow">
                 <Search className="w-12 h-12 text-violet-600 mb-4" />
                 <h3 className="text-xl font-semibold mb-3">Smart Search</h3>
-                <p className="text-gray-600">AI-powered search that understands context and finds relevant papers instantly.</p>
+                <p className="text-gray-600">
+                  AI-powered search that understands context and finds relevant
+                  papers instantly.
+                </p>
               </div>
               <div className="p-6 bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow">
                 <Zap className="w-12 h-12 text-violet-600 mb-4" />
-                <h3 className="text-xl font-semibold mb-3">Real-time Updates</h3>
-                <p className="text-gray-600">Stay current with instant notifications about new papers in your field.</p>
+                <h3 className="text-xl font-semibold mb-3">
+                  Real-time Updates
+                </h3>
+                <p className="text-gray-600">
+                  Stay current with instant notifications about new papers in
+                  your field.
+                </p>
               </div>
               <div className="p-6 bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow">
                 <Users className="w-12 h-12 text-violet-600 mb-4" />
                 <h3 className="text-xl font-semibold mb-3">Collaboration</h3>
-                <p className="text-gray-600">Work seamlessly with your team, share insights, and manage projects together.</p>
+                <p className="text-gray-600">
+                  Work seamlessly with your team, share insights, and manage
+                  projects together.
+                </p>
               </div>
             </div>
           </div>
@@ -199,18 +174,31 @@ Would you like more details about a specific plan?`
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
               <div className="flex flex-col items-center text-center">
                 <BookOpen className="w-12 h-12 text-violet-600 mb-4" />
-                <h3 className="text-xl font-semibold mb-3">Comprehensive Library</h3>
-                <p className="text-gray-600">Access millions of research papers across all academic disciplines.</p>
+                <h3 className="text-xl font-semibold mb-3">
+                  Comprehensive Library
+                </h3>
+                <p className="text-gray-600">
+                  Access millions of research papers across all academic
+                  disciplines.
+                </p>
               </div>
               <div className="flex flex-col items-center text-center">
                 <Globe className="w-12 h-12 text-violet-600 mb-4" />
                 <h3 className="text-xl font-semibold mb-3">Global Network</h3>
-                <p className="text-gray-600">Connect with researchers worldwide and expand your academic network.</p>
+                <p className="text-gray-600">
+                  Connect with researchers worldwide and expand your academic
+                  network.
+                </p>
               </div>
               <div className="flex flex-col items-center text-center">
                 <Award className="w-12 h-12 text-violet-600 mb-4" />
-                <h3 className="text-xl font-semibold mb-3">Research Excellence</h3>
-                <p className="text-gray-600">Enhance your research quality with AI-powered insights and recommendations.</p>
+                <h3 className="text-xl font-semibold mb-3">
+                  Research Excellence
+                </h3>
+                <p className="text-gray-600">
+                  Enhance your research quality with AI-powered insights and
+                  recommendations.
+                </p>
               </div>
             </div>
           </div>
@@ -223,33 +211,81 @@ Would you like more details about a specific plan?`
               <div>
                 <h3 className="font-semibold mb-4">Product</h3>
                 <ul className="space-y-2">
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">Features</a></li>
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">Pricing</a></li>
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">API</a></li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      Features
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      Pricing
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      API
+                    </a>
+                  </li>
                 </ul>
               </div>
               <div>
                 <h3 className="font-semibold mb-4">Company</h3>
                 <ul className="space-y-2">
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">About</a></li>
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">Blog</a></li>
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">Careers</a></li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      About
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      Blog
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      Careers
+                    </a>
+                  </li>
                 </ul>
               </div>
               <div>
                 <h3 className="font-semibold mb-4">Resources</h3>
                 <ul className="space-y-2">
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">Documentation</a></li>
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">Help Center</a></li>
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">Community</a></li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      Documentation
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      Help Center
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      Community
+                    </a>
+                  </li>
                 </ul>
               </div>
               <div>
                 <h3 className="font-semibold mb-4">Legal</h3>
                 <ul className="space-y-2">
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">Privacy</a></li>
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">Terms</a></li>
-                  <li><a href="#" className="text-gray-600 hover:text-violet-600">Security</a></li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      Privacy
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      Terms
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-gray-600 hover:text-violet-600">
+                      Security
+                    </a>
+                  </li>
                 </ul>
               </div>
             </div>
@@ -264,7 +300,10 @@ Would you like more details about a specific plan?`
 
   return (
     <div className="min-h-screen bg-white">
-      <Sidebar isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+      <Sidebar
+        isOpen={isSidebarOpen}
+        toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+      />
       {renderContent()}
     </div>
   );
