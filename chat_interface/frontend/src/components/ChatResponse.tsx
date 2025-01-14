@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import ChatInput from "./ChatInput";
 import LoadingResponse from "./LoadingResponse";
@@ -10,38 +10,48 @@ interface ChatItem {
 }
 
 interface ChatResponseProps {
-  chatHistory: { query: string; response: string }[];
-  onSubmit: (query: string) => Promise<void>;
+  chatHistory: ChatItem[];
   onBack: () => void;
   isLoading: boolean;
-  setChatHistory: React.Dispatch<
-    React.SetStateAction<{ query: string; response: string }[]>
-  >;
+  setChatHistory: React.Dispatch<React.SetStateAction<ChatItem[]>>;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  conversationId?: string;
 }
 
 const ChatResponse: React.FC<ChatResponseProps> = ({
   chatHistory,
-  onSubmit,
   onBack,
   isLoading,
   setChatHistory,
   setIsLoading,
+  conversationId,
 }) => {
-  // 1) Parent handle function to do the LLM call
-  const handleChatSubmit = async (query: string) => {
-    // Show loading spinner immediately
-    setIsLoading(true);
+  // 1) We'll keep a ref to a "dummy" div at the bottom
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
+  // 2) Whenever chatHistory or isLoading changes, scroll to bottom
+  useEffect(() => {
+    // small timeout so the DOM can update before we scroll
+    const scrollToBottom = () => {
+      if (bottomRef.current) {
+        bottomRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    };
+    scrollToBottom();
+  }, [chatHistory, isLoading]);
+
+  // Option A: Let the parent handle conversationId
+  // Option B: Handle it internally for follow-ups
+  const handleFollowup = async (query: string) => {
+    setIsLoading(true);
     try {
-      const response = await sendChatMessage(query);
-      // Now we have an LLM response, so let's append it:
-      setChatHistory((prev) => [...prev, { query, response }]);
+      // Pass the same conversationId so we append to the same file
+      const data = await sendChatMessage(query, conversationId);
+      setChatHistory((prev) => [...prev, { query, response: data.response }]);
     } catch (error) {
       console.error("Failed to get response:", error);
-      // Optionally show an error message to the user
     } finally {
-      setIsLoading(false); // Hide loading screen once done or on error
+      setIsLoading(false);
     }
   };
 
@@ -65,6 +75,7 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
         </div>
       </header>
 
+      {/* 3) Make the messages container scrollable */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-4xl mx-auto px-4 py-8">
           {chatHistory.map(({ query, response }, index) => (
@@ -73,7 +84,7 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
                 <div className="text-sm text-violet-600 mb-2 font-medium font-display">
                   Your question
                 </div>
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-violet-100 transform hover:scale-[1.01] transition-transform">
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-violet-100">
                   {query}
                 </div>
               </div>
@@ -83,36 +94,30 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
                   <MessageSquare size={16} className="mr-2" />
                   Response
                 </div>
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-violet-100 prose max-w-none transform hover:scale-[1.01] transition-transform">
-                  {response.split("\n").map((line, i) => (
-                    <React.Fragment key={i}>
-                      {line}
-                      <br />
-                    </React.Fragment>
-                  ))}
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-violet-100 prose max-w-none whitespace-pre-wrap">
+                  {response}
                 </div>
               </div>
             </div>
           ))}
 
-          {/* Show loading spinner if user just pressed Send */}
+          {/* Show a loading spinner if user just pressed Send */}
           {isLoading && (
-            <div className="mb-8 animate-fade-in">
+            <div className="mb-8">
               <LoadingResponse />
             </div>
           )}
 
-          {/* The "Ask a follow-up question" input */}
-          <div className="animate-fade-in">
+          {/* 4) The "Ask a follow-up" input */}
+          <div>
             <div className="text-sm text-violet-600 mb-2 font-medium font-display">
               Ask a follow-up question
             </div>
-            {/*
-              Our ChatInput calls handleChatSubmit(query),
-              which triggers isLoading = true immediately.
-            */}
-            <ChatInput onSubmit={handleChatSubmit} />
+            <ChatInput onSubmit={handleFollowup} />
           </div>
+
+          {/* 5) Our "dummy" div to scroll into view */}
+          <div ref={bottomRef}></div>
         </div>
       </div>
     </div>

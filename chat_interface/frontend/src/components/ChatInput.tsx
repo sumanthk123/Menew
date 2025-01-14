@@ -1,8 +1,8 @@
+// ChatInput.tsx
 import React, { useState } from "react";
 import { Send } from "lucide-react";
 
 interface ChatInputProps {
-  // Instead of accepting (query, response), we accept just (query)
   onSubmit: (query: string) => void;
 }
 
@@ -14,12 +14,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSubmit }) => {
     e.preventDefault();
     if (input.trim() && !isSubmitting) {
       setIsSubmitting(true);
-      // Immediately disable the input/button.
       onSubmit(input.trim());
-      // We send only the user's query upwards.
       setInput("");
       setIsSubmitting(false);
-      // We'll let the parent control isLoading for the big spinner.
     }
   };
 
