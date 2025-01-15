@@ -1,0 +1,10 @@
+protocols: 0.4590
+that: 0.4590
+the: 0.4735
+transactions: 0.4745
+interoperability: 0.4753
+privacy: 0.4864
+bitcoin: 0.4870
+cryptocurrencies: 0.4887
+getnumber: 0.4951
+cryptographically: 0.5210
