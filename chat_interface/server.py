@@ -3,6 +3,7 @@ from flask_cors import CORS
 import os
 import re
 from llama_index.llms.ollama import Ollama
+import subprocess
 
 app = Flask(__name__)
 CORS(app)
@@ -55,6 +56,7 @@ def append_turn_to_file(conversation_id: str, user_text: str, assistant_text: st
     with open(file_path, mode, encoding="utf-8") as f:
         f.write(f"User: {user_text}\n")
         f.write(f"Assistant: {assistant_text}\n\n")
+    subprocess.run(["python", "insights.py"])
 
 
 @app.route("/chat", methods=["POST"])

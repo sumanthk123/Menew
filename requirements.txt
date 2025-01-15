@@ -1,6 +1,10 @@
 flask 
 flask_cors
 llama_index
+keybert
+nltk
+transformers
+sentence-transformers
 
 
-"you need to pull this Ollama model if you havent hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF:latest"
+# you need to pull this Ollama model if you havent hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF:latest
