@@ -11,13 +11,18 @@ app = Flask(__name__)
 CORS(app)
 
 
+SUPABASE_URL = "https://lffgvxlrhtnxwrbedvhc.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmZmd2eGxyaHRueHdyYmVkdmhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY5OTY2NTAsImV4cCI6MjA1MjU3MjY1MH0.mJpVa789C7rCdXg3QEp3jWJWXtc4XCQ8Xu0yh-ztiEY"
+
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 MAX_CONVERSATIONS_PER_USER = 5 
 
 
-
+API_URL = "https://api-inference.huggingface.co/models/deepset/roberta-base-squad2"
+API_TOKEN = "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"
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
 
