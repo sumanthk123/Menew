@@ -16,6 +16,9 @@ interface ChatResponseProps {
   setChatHistory: React.Dispatch<React.SetStateAction<ChatItem[]>>;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
   conversationId?: string;
+
+  /** Add a userId prop so we can pass it to sendChatMessage */
+  userId: string | null;
 }
 
 const ChatResponse: React.FC<ChatResponseProps> = ({
@@ -25,28 +28,33 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
   setChatHistory,
   setIsLoading,
   conversationId,
+  userId,
 }) => {
   // 1) We'll keep a ref to a "dummy" div at the bottom
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   // 2) Whenever chatHistory or isLoading changes, scroll to bottom
   useEffect(() => {
-    // small timeout so the DOM can update before we scroll
     const scrollToBottom = () => {
       if (bottomRef.current) {
         bottomRef.current.scrollIntoView({ behavior: "smooth" });
       }
     };
+    // small timeout so the DOM can update before we scroll
     scrollToBottom();
   }, [chatHistory, isLoading]);
 
-  // Option A: Let the parent handle conversationId
-  // Option B: Handle it internally for follow-ups
+  // Submit a follow-up question
   const handleFollowup = async (query: string) => {
+    if (!userId) {
+      console.error("No userId provided; cannot send follow-up.");
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Pass the same conversationId so we append to the same file
-      const data = await sendChatMessage(query, conversationId);
+      // Call sendChatMessage with the userId
+      const data = await sendChatMessage(query, conversationId, userId);
       setChatHistory((prev) => [...prev, { query, response: data.response }]);
     } catch (error) {
       console.error("Failed to get response:", error);
@@ -75,11 +83,12 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
         </div>
       </header>
 
-      {/* 3) Make the messages container scrollable */}
+      {/* Messages container */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-4xl mx-auto px-4 py-8">
           {chatHistory.map(({ query, response }, index) => (
             <div key={index} className="mb-8 animate-slide-in">
+              {/* User Query */}
               <div className="mb-4">
                 <div className="text-sm text-violet-600 mb-2 font-medium font-display">
                   Your question
@@ -89,6 +98,7 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
                 </div>
               </div>
 
+              {/* Assistant Response */}
               <div className="mb-8">
                 <div className="text-sm text-violet-600 mb-2 flex items-center font-medium font-display">
                   <MessageSquare size={16} className="mr-2" />
@@ -108,7 +118,7 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
             </div>
           )}
 
-          {/* 4) The "Ask a follow-up" input */}
+          {/* Follow-up input */}
           <div>
             <div className="text-sm text-violet-600 mb-2 font-medium font-display">
               Ask a follow-up question
@@ -116,7 +126,7 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
             <ChatInput onSubmit={handleFollowup} />
           </div>
 
-          {/* 5) Our "dummy" div to scroll into view */}
+          {/* Dummy div to scroll into view */}
           <div ref={bottomRef}></div>
         </div>
       </div>

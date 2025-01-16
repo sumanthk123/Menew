@@ -2,143 +2,254 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import os
 import re
-from llama_index.llms.ollama import Ollama
-import subprocess
+import requests
+import time
+from supabase import create_client, Client
 
 app = Flask(__name__)
 CORS(app)
 
-CONVERSATIONS_FOLDER = "conversations"
-if not os.path.exists(CONVERSATIONS_FOLDER):
-    os.makedirs(CONVERSATIONS_FOLDER)
+# --------------------------------------------------------------------
+# Supabase initialization
+# --------------------------------------------------------------------
 
-llm = Ollama(
-    model="hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF:latest",
-    request_timeout=120.0
-)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+MAX_CONVERSATIONS_PER_USER = 5  # per-user limit
 
-def sanitize_filename(text: str) -> str:
-    text = text.strip().lower()
-    text = re.sub(r"[^a-z0-9_\- ]", "", text)
-    text = text.replace(" ", "_")
-    if not text:
-        text = "conversation"
-    text = text[:50]
+# --------------------------------------------------------------------
+# Hugging Face API configuration
+# --------------------------------------------------------------------
+API_URL = "https://api-inference.huggingface.co/models/deepset/roberta-base-squad2"
+API_TOKEN = "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"
+headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
-    base_name = text
-    file_path = os.path.join(CONVERSATIONS_FOLDER, f"{base_name}.txt")
-    suffix = 2
+# --------------------------------------------------------------------
+# Database utility functions
+# --------------------------------------------------------------------
+def create_new_conversation(user_id: str, title: str, initial_context: str) -> int:
+    """
+    Inserts a new row in `conversations`, letting the DB auto-increment `id`.
+    Returns that newly created ID (int).
+    """
+    res = supabase.table("conversations").insert({
+        "user_id": user_id,         # must match auth.uid() if RLS is on
+        "title": title,             # user-friendly conversation name
+        "content": f"{initial_context}\n"
+    }).execute()
+    # res.data is the newly inserted row(s). We'll extract the first row's "id"
+    new_id = res.data[0]["id"]
+    return new_id
 
-    while os.path.exists(file_path):
-        new_name = f"{base_name}_{suffix}"
-        file_path = os.path.join(CONVERSATIONS_FOLDER, f"{new_name}.txt")
-        suffix += 1
+def load_conversation_memory(convo_id: int) -> str:
+    """
+    Loads the 'content' field for the given conversation's ID.
+    Returns an empty string if none found.
+    """
+    response = supabase.table("conversations") \
+        .select("content") \
+        .eq("id", convo_id) \
+        .execute()
+    rows = response.data
+    if rows and len(rows) > 0:
+        return rows[0].get("content", "")
+    return ""
 
-    final_name = os.path.splitext(os.path.basename(file_path))[0]
-    return final_name
+def append_turn_to_db(convo_id: int, user_id: str, user_text: str, assistant_text: str):
+    """
+    Append a new Q&A turn to the existing content.
+    """
+    existing_content = load_conversation_memory(convo_id)
+    new_content = existing_content + f"User: {user_text}\nAssistant: {assistant_text}\n\n"
+    supabase.table("conversations") \
+        .update({"content": new_content}) \
+        .eq("id", convo_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
+def list_user_conversations(user_id: str):
+    """
+    Returns a list of conversation metadata for the user.
+    Example: [ { "id": 1, "title": "My first convo" }, ... ]
+    """
+    response = supabase.table("conversations") \
+        .select("id,title") \
+        .eq("user_id", user_id) \
+        .order("id", desc=True) \
+        .execute()
 
-def load_conversation_memory(conversation_id: str) -> str:
-   
-    file_path = os.path.join(CONVERSATIONS_FOLDER, f"{conversation_id}.txt")
-    if not os.path.isfile(file_path):
-        return ""  
+    rows = response.data
+    if rows:
+        return rows
+    return []
 
-    with open(file_path, "r", encoding="utf-8") as f:
-        return f.read()
+def delete_conversation_db(convo_id: int, user_id: str):
+    """
+    Deletes the conversation with the given ID IF it belongs to user_id.
+    """
+    supabase.table("conversations") \
+        .delete() \
+        .eq("id", convo_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-
-def append_turn_to_file(conversation_id: str, user_text: str, assistant_text: str):
-   
-    file_path = os.path.join(CONVERSATIONS_FOLDER, f"{conversation_id}.txt")
-    mode = "a" if os.path.exists(file_path) else "w"
-    with open(file_path, mode, encoding="utf-8") as f:
-        f.write(f"User: {user_text}\n")
-        f.write(f"Assistant: {assistant_text}\n\n")
-    subprocess.run(["python", "insights.py"])
-
+# --------------------------------------------------------------------
+# Flask endpoints
+# --------------------------------------------------------------------
+@app.route("/")
+def home():
+    return jsonify({"message": "Hello, Flask is running on Supabase with auto-increment IDs and a 'title' column!"})
 
 @app.route("/chat", methods=["POST"])
 def chat():
+    """
+    Expects JSON:
+      {
+        "message": "User's query",
+        "conversation_id": optional integer,
+        "user_id": "UUID from supabase.auth"
+      }
+    Returns JSON:
+      {
+        "conversation_id": int,
+        "response": "Assistant's answer",
+        "title": optional, if newly created
+      }
+    """
     data = request.json
     user_message = data.get("message", "").strip()
     conversation_id = data.get("conversation_id")  # optional
+    user_id = data.get("user_id")
 
-    if not user_message:
-        return jsonify({"error": "No message provided"}), 400
+    if not user_message or not user_id:
+        return jsonify({"error": "Message and user ID are required"}), 400
 
     if not conversation_id:
-        conversation_id = sanitize_filename(user_message)
-        conversation_history = ""
+        # Check how many convos user already has
+        user_convos = list_user_conversations(user_id)
+        if len(user_convos) >= MAX_CONVERSATIONS_PER_USER:
+            return jsonify({"error": "Maximum number of conversations reached"}), 403
+
+        # Derive a title from the first user message (truncated at 50 chars)
+        title_for_this_convo = user_message[:50]
+
+        initial_context = "The first president of the United States was George Washington."
+        # Create a new conversation row in the DB
+        conversation_id = create_new_conversation(user_id, title_for_this_convo, initial_context)
+        conversation_history = initial_context
     else:
+        # conversation_id was provided; parse it to int
+        try:
+            conversation_id = int(conversation_id)
+        except ValueError:
+            return jsonify({"error": "conversation_id must be an integer"}), 400
+
         conversation_history = load_conversation_memory(conversation_id)
 
-    prompt = f"""
-You are a research assistant specializing in academic papers.
-Provide a brief, focused answer using the available knowledge.
-
-History:
-{conversation_history}
-
-
-User: {user_message}
-Assistant:
-"""
-    print(conversation_history)
+    # Call external LLM or QA model
     try:
-        response_obj = llm.complete(prompt)
-        assistant_text = response_obj.text.strip()
+        print(f"Sending request to API with context: {conversation_history} and question: {user_message}")
+        response = requests.post(API_URL, headers=headers, json={
+            "inputs": {
+                "context": conversation_history,
+                "question": user_message
+            }
+        })
+        print(f"API response status: {response.status_code}, response: {response.text}")
+        result = response.json()
 
-        append_turn_to_file(conversation_id, user_message, assistant_text)
+        if response.status_code != 200:
+            return jsonify({"error": "Failed to generate response", "details": result}), response.status_code
+
+        if "error" in result:
+            if "loading" in result["error"]:
+                print("Model is loading, retrying in 20 seconds...")
+                time.sleep(20)
+                return chat()  # Retry
+            else:
+                return jsonify({"error": result["error"]}), 500
+
+        assistant_text = result.get("answer", "No answer found.")
+        append_turn_to_db(conversation_id, user_id, user_message, assistant_text)
 
         return jsonify({
             "conversation_id": conversation_id,
             "response": assistant_text
+            # If you want to also return the title, you could do something like:
+            # "title": title_for_this_convo if newly created
         })
-    except Exception as e:
-        print("Error in LLM completion:", str(e))
-        return jsonify({"error": "Failed to generate response"}), 500
 
+    except Exception as e:
+        print("Error in API request:", str(e))
+        return jsonify({"error": "Failed to generate response", "details": str(e)}), 500
 
 @app.route("/conversations", methods=["GET"])
-def list_conversations():
+def list_conversations_route():
     """
-    Returns an array of conversation IDs (file names without .txt).
+    GET /conversations?user_id=<uuid>
+    Returns an array of objects: [{ "id": int, "title": "..." }, ...]
     """
-    files = os.listdir(CONVERSATIONS_FOLDER)
-    conversation_ids = [
-        f.replace(".txt", "") for f in files if f.endswith(".txt")
-    ]
-    return jsonify(conversation_ids), 200
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
 
+    convos = list_user_conversations(user_id)
+    return jsonify(convos), 200
 
-@app.route("/conversations/<conversation_id>", methods=["GET"])
-def get_conversation(conversation_id):
+@app.route("/conversations/<convo_id>", methods=["GET"])
+def get_conversation_route(convo_id):
+    """
+    GET /conversations/<id>?user_id=<uuid>
+    Returns:
+      {
+        "conversation_id": int,
+        "title": "...",
+        "content": "..."
+      }
+    """
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
 
-    file_path = os.path.join(CONVERSATIONS_FOLDER, f"{conversation_id}.txt")
-    if not os.path.isfile(file_path):
+    try:
+        convo_id = int(convo_id)
+    except ValueError:
+        return jsonify({"error": "Conversation ID must be an integer"}), 400
+
+    # Query the conversation row
+    response = supabase.table("conversations") \
+        .select("id,title,content") \
+        .eq("id", convo_id) \
+        .eq("user_id", user_id) \
+        .execute()
+
+    rows = response.data
+    if not rows:
         return jsonify({"error": "Conversation not found"}), 404
 
-    with open(file_path, "r", encoding="utf-8") as f:
-        content = f.read()
-
+    row = rows[0]
     return jsonify({
-        "conversation_id": conversation_id,
-        "content": content
+        "conversation_id": row["id"],
+        "title": row["title"],
+        "content": row["content"]
     }), 200
 
+@app.route("/conversations/<convo_id>", methods=["DELETE"])
+def delete_conversation_route(convo_id):
+    """
+    DELETE /conversations/<id>?user_id=<uuid>
+    """
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
 
-@app.route("/conversations/<conversation_id>", methods=["DELETE"])
-def delete_conversation(conversation_id):
-   
-    file_path = os.path.join(CONVERSATIONS_FOLDER, f"{conversation_id}.txt")
-    if not os.path.isfile(file_path):
-        return jsonify({"error": "Conversation not found"}), 404
+    try:
+        convo_id = int(convo_id)
+    except ValueError:
+        return jsonify({"error": "Conversation ID must be an integer"}), 400
 
-    os.remove(file_path)
-    return jsonify({"message": f"Conversation '{conversation_id}' deleted"}), 200
-
+    delete_conversation_db(convo_id, user_id)
+    return jsonify({"message": f"Conversation '{convo_id}' deleted"}), 200
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)

@@ -1,11 +1,14 @@
+// chatService.ts
 export interface ChatResponseData {
   conversation_id: string;
   response: string;
 }
 
+// This now expects a `userId`
 export const sendChatMessage = async (
   message: string,
-  conversationId?: string
+  conversationId: string | undefined,
+  userId: string
 ): Promise<ChatResponseData> => {
   try {
     const response = await fetch("http://localhost:5000/chat", {
@@ -15,7 +18,8 @@ export const sendChatMessage = async (
       },
       body: JSON.stringify({
         message,
-        conversation_id: conversationId, // optional
+        conversation_id: conversationId,
+        user_id: userId, // Include user ID
       }),
     });
     if (!response.ok) {
@@ -29,9 +33,14 @@ export const sendChatMessage = async (
   }
 };
 
-export const listConversations = async (): Promise<string[]> => {
+export const listConversations = async (userId: string): Promise<string[]> => {
   try {
-    const response = await fetch("http://localhost:5000/conversations");
+    // Include the user ID in query params
+    const response = await fetch(
+      `http://localhost:5000/conversations?user_id=${encodeURIComponent(
+        userId
+      )}`
+    );
     if (!response.ok) {
       throw new Error("Failed to list conversations");
     }
@@ -49,11 +58,15 @@ export interface GetConversationResult {
 }
 
 export const getConversation = async (
-  conversationId: string
+  conversationId: string,
+  userId: string
 ): Promise<GetConversationResult> => {
   try {
+    // Include the user ID in query params
     const response = await fetch(
-      `http://localhost:5000/conversations/${conversationId}`
+      `http://localhost:5000/conversations/${conversationId}?user_id=${encodeURIComponent(
+        userId
+      )}`
     );
     if (!response.ok) {
       throw new Error("Failed to get conversation");
@@ -66,11 +79,15 @@ export const getConversation = async (
 };
 
 export const deleteConversation = async (
-  conversationId: string
+  conversationId: string,
+  userId: string
 ): Promise<void> => {
   try {
+    // Include the user ID in query params
     const response = await fetch(
-      `http://localhost:5000/conversations/${conversationId}`,
+      `http://localhost:5000/conversations/${conversationId}?user_id=${encodeURIComponent(
+        userId
+      )}`,
       {
         method: "DELETE",
       }
