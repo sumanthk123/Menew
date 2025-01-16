@@ -15,9 +15,7 @@ interface ChatResponseProps {
   isLoading: boolean;
   setChatHistory: React.Dispatch<React.SetStateAction<ChatItem[]>>;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  conversationId?: string;
-
-  /** Add a userId prop so we can pass it to sendChatMessage */
+  conversationId?: number; // Updated type: number instead of string
   userId: string | null;
 }
 
@@ -30,21 +28,17 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
   conversationId,
   userId,
 }) => {
-  // 1) We'll keep a ref to a "dummy" div at the bottom
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  // 2) Whenever chatHistory or isLoading changes, scroll to bottom
   useEffect(() => {
     const scrollToBottom = () => {
       if (bottomRef.current) {
         bottomRef.current.scrollIntoView({ behavior: "smooth" });
       }
     };
-    // small timeout so the DOM can update before we scroll
     scrollToBottom();
   }, [chatHistory, isLoading]);
 
-  // Submit a follow-up question
   const handleFollowup = async (query: string) => {
     if (!userId) {
       console.error("No userId provided; cannot send follow-up.");
@@ -53,7 +47,7 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
 
     setIsLoading(true);
     try {
-      // Call sendChatMessage with the userId
+      // Use numeric conversationId with sendChatMessage
       const data = await sendChatMessage(query, conversationId, userId);
       setChatHistory((prev) => [...prev, { query, response: data.response }]);
     } catch (error) {
@@ -83,12 +77,10 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
         </div>
       </header>
 
-      {/* Messages container */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-4xl mx-auto px-4 py-8">
           {chatHistory.map(({ query, response }, index) => (
             <div key={index} className="mb-8 animate-slide-in">
-              {/* User Query */}
               <div className="mb-4">
                 <div className="text-sm text-violet-600 mb-2 font-medium font-display">
                   Your question
@@ -98,7 +90,6 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
                 </div>
               </div>
 
-              {/* Assistant Response */}
               <div className="mb-8">
                 <div className="text-sm text-violet-600 mb-2 flex items-center font-medium font-display">
                   <MessageSquare size={16} className="mr-2" />
@@ -111,14 +102,12 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
             </div>
           ))}
 
-          {/* Show a loading spinner if user just pressed Send */}
           {isLoading && (
             <div className="mb-8">
               <LoadingResponse />
             </div>
           )}
 
-          {/* Follow-up input */}
           <div>
             <div className="text-sm text-violet-600 mb-2 font-medium font-display">
               Ask a follow-up question
@@ -126,7 +115,6 @@ const ChatResponse: React.FC<ChatResponseProps> = ({
             <ChatInput onSubmit={handleFollowup} />
           </div>
 
-          {/* Dummy div to scroll into view */}
           <div ref={bottomRef}></div>
         </div>
       </div>

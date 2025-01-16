@@ -1,13 +1,16 @@
-// chatService.ts
 export interface ChatResponseData {
-  conversation_id: string;
+  conversation_id: number;
   response: string;
 }
 
-// This now expects a `userId`
+export interface ConversationMeta {
+  id: number;
+  title: string;
+}
+
 export const sendChatMessage = async (
   message: string,
-  conversationId: string | undefined,
+  conversationId: number | undefined,
   userId: string
 ): Promise<ChatResponseData> => {
   try {
@@ -19,7 +22,7 @@ export const sendChatMessage = async (
       body: JSON.stringify({
         message,
         conversation_id: conversationId,
-        user_id: userId, // Include user ID
+        user_id: userId,
       }),
     });
     if (!response.ok) {
@@ -33,9 +36,10 @@ export const sendChatMessage = async (
   }
 };
 
-export const listConversations = async (userId: string): Promise<string[]> => {
+export const listConversations = async (
+  userId: string
+): Promise<ConversationMeta[]> => {
   try {
-    // Include the user ID in query params
     const response = await fetch(
       `https://server-for-startup.vercel.app/conversations?user_id=${encodeURIComponent(
         userId
@@ -44,8 +48,8 @@ export const listConversations = async (userId: string): Promise<string[]> => {
     if (!response.ok) {
       throw new Error("Failed to list conversations");
     }
-    const data = await response.json();
-    return data; // array of strings
+    const data: ConversationMeta[] = await response.json();
+    return data;
   } catch (error) {
     console.error("Error listing conversations:", error);
     throw error;
@@ -53,16 +57,16 @@ export const listConversations = async (userId: string): Promise<string[]> => {
 };
 
 export interface GetConversationResult {
-  conversation_id: string;
+  conversation_id: number;
   content: string;
+  title: string;
 }
 
 export const getConversation = async (
-  conversationId: string,
+  conversationId: number,
   userId: string
 ): Promise<GetConversationResult> => {
   try {
-    // Include the user ID in query params
     const response = await fetch(
       `https://server-for-startup.vercel.app/conversations/${conversationId}?user_id=${encodeURIComponent(
         userId
@@ -71,7 +75,8 @@ export const getConversation = async (
     if (!response.ok) {
       throw new Error("Failed to get conversation");
     }
-    return await response.json();
+    const data: GetConversationResult = await response.json();
+    return data;
   } catch (error) {
     console.error("Error fetching conversation:", error);
     throw error;
@@ -79,11 +84,10 @@ export const getConversation = async (
 };
 
 export const deleteConversation = async (
-  conversationId: string,
+  conversationId: number,
   userId: string
 ): Promise<void> => {
   try {
-    // Include the user ID in query params
     const response = await fetch(
       `https://server-for-startup.vercel.app/conversations/${conversationId}?user_id=${encodeURIComponent(
         userId
