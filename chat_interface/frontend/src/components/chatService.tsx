@@ -11,7 +11,7 @@ export const sendChatMessage = async (
   userId: string
 ): Promise<ChatResponseData> => {
   try {
-    const response = await fetch("http://localhost:5000/chat", {
+    const response = await fetch("https://server-for-startup.vercel.app/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -37,7 +37,7 @@ export const listConversations = async (userId: string): Promise<string[]> => {
   try {
     // Include the user ID in query params
     const response = await fetch(
-      `http://localhost:5000/conversations?user_id=${encodeURIComponent(
+      `https://server-for-startup.vercel.app/conversations?user_id=${encodeURIComponent(
         userId
       )}`
     );
@@ -64,7 +64,7 @@ export const getConversation = async (
   try {
     // Include the user ID in query params
     const response = await fetch(
-      `http://localhost:5000/conversations/${conversationId}?user_id=${encodeURIComponent(
+      `https://server-for-startup.vercel.app/conversations/${conversationId}?user_id=${encodeURIComponent(
         userId
       )}`
     );
@@ -85,7 +85,7 @@ export const deleteConversation = async (
   try {
     // Include the user ID in query params
     const response = await fetch(
-      `http://localhost:5000/conversations/${conversationId}?user_id=${encodeURIComponent(
+      `https://server-for-startup.vercel.app/conversations/${conversationId}?user_id=${encodeURIComponent(
         userId
       )}`,
       {
