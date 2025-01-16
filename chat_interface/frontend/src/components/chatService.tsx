@@ -8,7 +8,7 @@ export const sendChatMessage = async (
   conversationId?: string
 ): Promise<ChatResponseData> => {
   try {
-    const response = await fetch("http://localhost:5000/chat", {
+    const response = await fetch("https://server-for-startup.vercel.app/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -31,7 +31,9 @@ export const sendChatMessage = async (
 
 export const listConversations = async (): Promise<string[]> => {
   try {
-    const response = await fetch("http://localhost:5000/conversations");
+    const response = await fetch(
+      "https://server-for-startup.vercel.app/conversations"
+    );
     if (!response.ok) {
       throw new Error("Failed to list conversations");
     }
@@ -53,7 +55,7 @@ export const getConversation = async (
 ): Promise<GetConversationResult> => {
   try {
     const response = await fetch(
-      `http://localhost:5000/conversations/${conversationId}`
+      `https://server-for-startup.vercel.app/conversations/${conversationId}`
     );
     if (!response.ok) {
       throw new Error("Failed to get conversation");
@@ -70,7 +72,7 @@ export const deleteConversation = async (
 ): Promise<void> => {
   try {
     const response = await fetch(
-      `http://localhost:5000/conversations/${conversationId}`,
+      `https://server-for-startup.vercel.app/conversations/${conversationId}`,
       {
         method: "DELETE",
       }

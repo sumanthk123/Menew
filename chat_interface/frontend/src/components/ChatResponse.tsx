@@ -20,6 +20,7 @@ interface ChatResponseProps {
 
 const ChatResponse: React.FC<ChatResponseProps> = ({
   chatHistory,
+  onSubmit,
   onBack,
   isLoading,
   setChatHistory,
