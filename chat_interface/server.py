@@ -5,6 +5,8 @@ import re
 import requests
 import time
 from supabase import create_client, Client
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__)
 CORS(app)
@@ -22,6 +24,39 @@ MAX_CONVERSATIONS_PER_USER = 5
 
 
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
+
+def query_arxiv_data():
+    response = supabase.table('arxiv_data').select('*').execute()
+    return response
+
+def keywords_query(user_id):
+    # with open('insights.txt', 'r') as file:
+    #     keywords = file.read().splitlines()
+    response = supabase.table('conversations').select('insights').eq('user_id', user_id).execute()
+    keywords = []
+    if response.data:
+        for row in response.data:
+            if row.get('insights'):
+                keywords.extend(row['insights'])
+    print(keywords)
+
+    response = query_arxiv_data()
+    abstracts = [paper['Abstract'] for paper in response.data]
+    vectorizer = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = vectorizer.fit_transform(abstracts)
+    keyword_vectors = vectorizer.transform(keywords)
+    num_top_matches = 30
+    for i, keyword in enumerate(keywords):
+        keyword_vector = keyword_vectors[i]
+        cosine_similarities = cosine_similarity(keyword_vector, tfidf_matrix).flatten()
+        top_indices = cosine_similarities.argsort()[-num_top_matches:][::-1]
+        # print(f"Top {num_top_matches} matches for keyword '{keyword}':")
+    articles = []
+    print(top_indices)
+    
+    for index in top_indices:
+        articles.append(response.data[index])
+    return articles
 
 def create_new_conversation(user_id: str, title: str, initial_context: str) -> int:
     """
@@ -91,6 +126,7 @@ def delete_conversation_db(convo_id: int, user_id: str):
 
 @app.route("/")
 def home():
+
     return jsonify({"message": "Hello, Flask is running on Supabase with auto-increment IDs and a 'title' column!"})
 
 @app.route("/chat", methods=["POST"])
@@ -236,6 +272,21 @@ def delete_conversation_route(convo_id):
 
     delete_conversation_db(convo_id, user_id)
     return jsonify({"message": f"Conversation '{convo_id}' deleted"}), 200
+
+@app.route("/keywords", methods=["GET"])
+def get_keywords_route():
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
+
+    try:
+        matching_articles = keywords_query(user_id)
+        # papers = query_arxiv_data()
+        # matching_papers = [papers.data[i] for i in matching_indices if i < len(papers.data)]
+        return jsonify(matching_articles), 200
+    except Exception as e:
+        print("Error in keywords query:", str(e))
+        return jsonify({"error": "Failed to get keyword matches", "details": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

@@ -8,13 +8,29 @@ export interface ConversationMeta {
   title: string;
 }
 
+
+export async function fetchKeywordMatches(userId: string) {
+  const response = await fetch(`http://localhost:5000/keywords?user_id=${encodeURIComponent(
+        userId
+      )}`);
+  // const response = await fetch(`https://server-for-startup.vercel.app/keywords?user_id=${encodeURIComponent(
+  //       userId
+  //     )}`);
+  if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch keyword matches');
+  }
+  return response.json();
+}
+
 export const sendChatMessage = async (
   message: string,
   conversationId: number | undefined,
   userId: string
 ): Promise<ChatResponseData> => {
   try {
-    const response = await fetch("https://server-for-startup.vercel.app/chat", {
+    const response = await fetch("http://localhost:5000/chat", {
+    // const response = await fetch("https://server-for-startup.vercel.app/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -41,10 +57,15 @@ export const listConversations = async (
 ): Promise<ConversationMeta[]> => {
   try {
     const response = await fetch(
-      `https://server-for-startup.vercel.app/conversations?user_id=${encodeURIComponent(
+      `http://localhost:5000/conversations?user_id=${encodeURIComponent(
         userId
       )}`
     );
+    // const response = await fetch(
+    //   `https://server-for-startup.vercel.app/conversations?user_id=${encodeURIComponent(
+    //     userId
+    //   )}`
+    // );
     if (!response.ok) {
       throw new Error("Failed to list conversations");
     }
@@ -68,10 +89,15 @@ export const getConversation = async (
 ): Promise<GetConversationResult> => {
   try {
     const response = await fetch(
-      `https://server-for-startup.vercel.app/conversations/${conversationId}?user_id=${encodeURIComponent(
+      `http://localhost:5000/conversations/${conversationId}?user_id=${encodeURIComponent(
         userId
       )}`
     );
+    // const response = await fetch(
+    //   `https://server-for-startup.vercel.app/conversations/${conversationId}?user_id=${encodeURIComponent(
+    //     userId
+    //   )}`
+    // );
     if (!response.ok) {
       throw new Error("Failed to get conversation");
     }
@@ -89,13 +115,21 @@ export const deleteConversation = async (
 ): Promise<void> => {
   try {
     const response = await fetch(
-      `https://server-for-startup.vercel.app/conversations/${conversationId}?user_id=${encodeURIComponent(
+      `http://localhost:5000/conversations/${conversationId}?user_id=${encodeURIComponent(
         userId
       )}`,
       {
         method: "DELETE",
       }
     );
+    // const response = await fetch(
+    //   `https://server-for-startup.vercel.app/conversations/${conversationId}?user_id=${encodeURIComponent(
+    //     userId
+    //   )}`,
+    //   {
+    //     method: "DELETE",
+    //   }
+    // );
     if (!response.ok) {
       throw new Error("Failed to delete conversation");
     }

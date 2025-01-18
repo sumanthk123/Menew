@@ -5,6 +5,7 @@ import ChatInput from "../components/ChatInput";
 import Suggestions from "../components/Suggestions";
 import ChatResponse from "../components/ChatResponse";
 import LoadingResponse from "../components/LoadingResponse";
+import KeywordMatches from "../components/KeywordMatches";
 
 import {
   sendChatMessage,
@@ -12,11 +13,13 @@ import {
   deleteConversation,
   getConversation,
   ConversationMeta,
+  fetchKeywordMatches,
 } from "../components/chatService";
 
 export default function App() {
   // Assuming you retrieve the authenticated user as before.
   const [userId, setUserId] = useState<string | null>(null);
+  const [keywordMatches, setKeywordMatches] = useState([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -31,6 +34,20 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    async function fetchMatches() {
+      if (userId) {
+        try {
+          const matches = await fetchKeywordMatches(userId);
+          setKeywordMatches(matches);
+        } catch (error) {
+          console.error('Failed to fetch keyword matches:', error);
+        }
+      }
+    }
+    fetchMatches();
+  }, [userId]);
 
   const [chatHistory, setChatHistory] = useState<
     Array<{ query: string; response: string }>
@@ -144,7 +161,7 @@ export default function App() {
           setChatHistory={setChatHistory}
           setIsLoading={setIsLoading}
           conversationId={conversationId}
-          userId={userId} // pass userId to ChatResponse for follow-ups
+          userId={userId}
         />
       );
     }
@@ -177,6 +194,8 @@ export default function App() {
           >
             <Suggestions onSubmit={handleSubmitQuery} />
           </div>
+
+          <KeywordMatches papers={keywordMatches} />
         </div>
       </main>
     );

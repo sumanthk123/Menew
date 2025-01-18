@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from flask import jsonify
 
 
 load_dotenv()
@@ -18,33 +19,26 @@ def query_arxiv_data():
     response = supabase.table('arxiv_data').select('*').execute()
     return response
 
-def keywords_query():
+def keywords_query(user_id):
     # with open('insights.txt', 'r') as file:
     #     keywords = file.read().splitlines()
-    keywords = [
-    "Organic Chemistry",
-    "Inorganic Chemistry",
-    "Analytical Chemistry",
-    "Physical Chemistry",
-    "Quantum Chemistry",
-    "Computational Chemistry",
-    "Chemical Kinetics",
-    "Spectroscopy",
-    "Polymer Chemistry",
-    "Nanomaterials",
-    "Catalysis",
-    "Electrochemistry",
-    "Green Chemistry",
-    "Biochemistry",
-    "Drug Discovery",
-    "Crystallography",
-    "Photochemistry",
-    "Supramolecular Chemistry",
-    "Materials Chemistry",
-    "Chemical Engineering"
-]
+    response = supabase.table('conversations').select('insights').eq('user_id', user_id).execute()
+    keywords = []
+    if response.data:
+        for row in response.data:
+            if row.get('insights'):
+                keywords.extend(row['insights'])
+    print(keywords)
 
     response = query_arxiv_data()
+    index = 30
+    temp = []
+    for i in range(index):
+        temp.append(response.data[i])
+    print(temp[0])
+
+    print(type(response.data[0]))
+    # print(jsonify(response.data[0]))
     abstracts = [paper['Abstract'] for paper in response.data]
     vectorizer = TfidfVectorizer(stop_words='english')
     tfidf_matrix = vectorizer.fit_transform(abstracts)
@@ -59,5 +53,5 @@ def keywords_query():
     # return [abstracts[index] for index in top_indices]
         
 # temp = [paper for paper in keywords_query().data]
-print(keywords_query())
+print(keywords_query('a63a6d1c-4e74-4368-a58a-b189b01de574'))
 
